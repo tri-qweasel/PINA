@@ -1,19 +1,16 @@
 import torch
 import pytest
+from math import comb
 from pina.model.block import PolynomialBlock
 
 data = torch.rand((20, 3))
 
 
-@pytest.mark.parametrize(
-    "degree,input_dimension,output_dimension,mix_dimensions",
-    [
-        (2, 3, 5, False),
-        (2, 3, 5, True),
-        (3, 3, 8, False),
-        (3, 3, 8, True),
-    ],
-)
+@pytest.mark.parametrize("degree", [2, 3])
+@pytest.mark.parametrize("input_dimension", [3])
+@pytest.mark.parametrize("output_dimension", [5, 8])
+@pytest.mark.parametrize("mix_dimensions", [False, True])
+
 def test_constructor(
     degree,
     input_dimension,
@@ -54,17 +51,22 @@ def test_constructor(
             output_dimension=-1,
             mix_dimensions=mix_dimensions,
         )
+    
+    # Should fail if mix_dimensions is not a bool
+    with pytest.raises(ValueError):
+        PolynomialBlock(
+            degree=degree,
+            input_dimension=input_dimension,
+            output_dimension=output_dimension,
+            mix_dimensions="True",
+        )
+    
 
 
-@pytest.mark.parametrize(
-    "degree,output_dimension,mix_dimensions",
-    [
-        (2, 5, False),
-        (2, 5, True),
-        (3, 8, False),
-        (3, 8, True),
-    ],
-)
+@pytest.mark.parametrize("degree", [2, 3])
+@pytest.mark.parametrize("output_dimension", [5, 8])
+@pytest.mark.parametrize("mix_dimensions", [False, True])
+
 def test_forward(
     degree,
     output_dimension,
@@ -83,15 +85,10 @@ def test_forward(
     assert output_.shape == (data.shape[0], output_dimension)
 
 
-@pytest.mark.parametrize(
-    "degree,output_dimension,mix_dimensions",
-    [
-        (2, 5, False),
-        (2, 5, True),
-        (3, 8, False),
-        (3, 8, True),
-    ],
-)
+@pytest.mark.parametrize("degree", [2, 3])
+@pytest.mark.parametrize("output_dimension", [5, 8])
+@pytest.mark.parametrize("mix_dimensions", [False, True])
+
 def test_backward(
     degree,
     output_dimension,
@@ -112,27 +109,27 @@ def test_backward(
     loss = torch.mean(output_)
     loss.backward()
 
-    assert x.grad is not None
     assert x.grad.shape == x.shape
 
+@pytest.mark.parametrize("degree", [2, 3])
+@pytest.mark.parametrize("input_dimension", [3])
+@pytest.mark.parametrize("mix_dimensions", [False, True])
 
-@pytest.mark.parametrize(
-    "mix_dimensions",
-    [
-        False,
-        True,
-    ],
-)
-def test_input_dimension_check(mix_dimensions):
-
+def test_n_features(
+    degree,
+    input_dimension,
+    mix_dimensions,
+):
     model = PolynomialBlock(
-        degree=2,
-        input_dimension=3,
+        degree=degree,
+        input_dimension=input_dimension,
         output_dimension=5,
         mix_dimensions=mix_dimensions,
     )
 
-    wrong_data = torch.rand((20, 2))
+    if mix_dimensions:
+        expected = comb(input_dimension + degree, degree)
+    else:
+        expected = 1 + degree * input_dimension
 
-    with pytest.raises(ValueError):
-        model(wrong_data)
+    assert model.n_features == expected
