@@ -3,14 +3,11 @@ import pytest
 from math import comb
 from pina.model.block import PolynomialBlock
 
-data = torch.rand((20, 3))
-
 
 @pytest.mark.parametrize("degree", [2, 3])
-@pytest.mark.parametrize("input_dimension", [3])
+@pytest.mark.parametrize("input_dimension", [3, 4])
 @pytest.mark.parametrize("output_dimension", [5, 8])
 @pytest.mark.parametrize("mix_dimensions", [False, True])
-
 def test_constructor(
     degree,
     input_dimension,
@@ -18,12 +15,20 @@ def test_constructor(
     mix_dimensions,
 ):
 
-    PolynomialBlock(
+    model = PolynomialBlock(
         degree=degree,
         input_dimension=input_dimension,
         output_dimension=output_dimension,
         mix_dimensions=mix_dimensions,
     )
+
+    # Test n_features
+    if mix_dimensions:
+        expected = comb(input_dimension + degree, degree)
+    else:
+        expected = 1 + degree * input_dimension
+
+    assert model.n_features == expected
 
     # Should fail if degree is negative
     with pytest.raises(AssertionError):
@@ -51,7 +56,7 @@ def test_constructor(
             output_dimension=-1,
             mix_dimensions=mix_dimensions,
         )
-    
+
     # Should fail if mix_dimensions is not a bool
     with pytest.raises(ValueError):
         PolynomialBlock(
@@ -60,22 +65,24 @@ def test_constructor(
             output_dimension=output_dimension,
             mix_dimensions="True",
         )
-    
 
 
 @pytest.mark.parametrize("degree", [2, 3])
+@pytest.mark.parametrize("input_dimension", [3, 4])
 @pytest.mark.parametrize("output_dimension", [5, 8])
 @pytest.mark.parametrize("mix_dimensions", [False, True])
-
 def test_forward(
     degree,
+    input_dimension,
     output_dimension,
     mix_dimensions,
 ):
 
+    data = torch.rand((20, input_dimension))
+
     model = PolynomialBlock(
         degree=degree,
-        input_dimension=data.shape[-1],
+        input_dimension=input_dimension,
         output_dimension=output_dimension,
         mix_dimensions=mix_dimensions,
     )
@@ -86,18 +93,21 @@ def test_forward(
 
 
 @pytest.mark.parametrize("degree", [2, 3])
+@pytest.mark.parametrize("input_dimension", [3, 4])
 @pytest.mark.parametrize("output_dimension", [5, 8])
 @pytest.mark.parametrize("mix_dimensions", [False, True])
-
 def test_backward(
     degree,
+    input_dimension,
     output_dimension,
     mix_dimensions,
 ):
 
+    data = torch.rand((20, input_dimension))
+
     model = PolynomialBlock(
         degree=degree,
-        input_dimension=data.shape[-1],
+        input_dimension=input_dimension,
         output_dimension=output_dimension,
         mix_dimensions=mix_dimensions,
     )
@@ -110,26 +120,3 @@ def test_backward(
     loss.backward()
 
     assert x.grad.shape == x.shape
-
-@pytest.mark.parametrize("degree", [2, 3])
-@pytest.mark.parametrize("input_dimension", [3])
-@pytest.mark.parametrize("mix_dimensions", [False, True])
-
-def test_n_features(
-    degree,
-    input_dimension,
-    mix_dimensions,
-):
-    model = PolynomialBlock(
-        degree=degree,
-        input_dimension=input_dimension,
-        output_dimension=5,
-        mix_dimensions=mix_dimensions,
-    )
-
-    if mix_dimensions:
-        expected = comb(input_dimension + degree, degree)
-    else:
-        expected = 1 + degree * input_dimension
-
-    assert model.n_features == expected
